@@ -4,7 +4,8 @@ import React, { createContext, useContext } from "react";
 import { useLocalStorage } from "@/lib/hooks/useLocalStorage";
 import { STORAGE_KEYS } from "@/lib/constants";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "https://api.markiti.co.ke/api/v1/";
 const LOGIN_URL = `${API_BASE_URL}auth/login`;
 
 export interface User {
