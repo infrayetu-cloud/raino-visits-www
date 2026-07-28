@@ -7,8 +7,7 @@ import { useAuth } from "@/lib/context/auth-context";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Lock, User, MapPin } from "lucide-react";
+import { Lock, User, Snowflake } from "lucide-react";
 
 interface LoginForm {
   username: string;
@@ -26,7 +25,6 @@ export default function LoginPage() {
     formState: { errors },
   } = useForm<LoginForm>();
 
-  // Already logged in — skip login page
   React.useEffect(() => {
     if (token) router.push("/");
   }, [token, router]);
@@ -46,37 +44,37 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 flex items-center justify-center p-4">
+    <main className="min-h-screen  flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mb-3 inline-flex items-center justify-center rounded-full bg-blue-100 p-3">
-            <MapPin className="h-6 w-6 text-blue-600" />
+          <div className="mb-3 inline-flex items-center justify-center rounded-2xl bg-[#494395] p-3">
+            <Snowflake className="h-6 w-6 text-[#2EC4B6]" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Visitor Entry System
+          <h1 className="text-2xl font-bold text-[#2E2A5E] ">
+            Security and Visitor Management system
           </h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-white/60">
             Sign in to manage visitor entries
           </p>
         </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white shadow-lg overflow-hidden">
-          <div className="h-1 bg-blue-600 w-full" />
+        <div className="rounded-2xl bg-white shadow-2xl shadow-black/30 overflow-hidden">
+          <div className="h-1.5 bg-[#2EC4B6] w-full" />
 
           <form onSubmit={handleSubmit(onSubmit)} className="p-8 space-y-5">
             <div>
               <Label
                 htmlFor="username"
-                className="text-sm font-semibold text-gray-700"
+                className="text-sm font-semibold text-[#2E2A5E]"
               >
                 Username
               </Label>
               <div className="relative mt-2">
-                <User className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                <User className="absolute left-3 top-3 h-5 w-5 text-[#7A759A]" />
                 <Input
                   id="username"
                   placeholder="Enter your username"
-                  className="pl-10 border-gray-300 focus:border-blue-500"
+                  className="pl-10 border-[#E4E1F0] focus:border-[#494395]"
                   {...register("username", {
                     required: "Username is required",
                   })}
@@ -92,17 +90,17 @@ export default function LoginPage() {
             <div>
               <Label
                 htmlFor="password"
-                className="text-sm font-semibold text-gray-700"
+                className="text-sm font-semibold text-[#2E2A5E]"
               >
                 Password
               </Label>
               <div className="relative mt-2">
-                <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                <Lock className="absolute left-3 top-3 h-5 w-5 text-[#7A759A]" />
                 <Input
                   id="password"
                   type="password"
                   placeholder="Enter your password"
-                  className="pl-10 border-gray-300 focus:border-blue-500"
+                  className="pl-10 border-[#E4E1F0] focus:border-[#494395]"
                   {...register("password", {
                     required: "Password is required",
                   })}
@@ -115,13 +113,13 @@ export default function LoginPage() {
               )}
             </div>
 
-            <Button
+            <button
               type="submit"
               disabled={loading}
-              className="w-full h-12 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold"
+              className="w-full h-12 rounded-lg bg-[#494395] hover:bg-[#3A3578] text-white font-semibold transition-colors disabled:opacity-50"
             >
               {loading ? "Signing in..." : "Sign In"}
-            </Button>
+            </button>
           </form>
         </div>
       </div>

@@ -20,10 +20,11 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { searchHosts } from "@/lib/api";
 
-interface Host {
+export interface Host {
   id: string;
-  names: string;
+  name: string;
   phonenumber?: string;
+  contact_phonenumber?: string;
 }
 
 interface HostSearchProps {
@@ -66,7 +67,7 @@ export function HostSearch({ onSelectHost }: HostSearchProps) {
   const handleSelect = (host: Host) => {
     const phone = host.phonenumber || "";
     setSelectedHost(host);
-    onSelectHost(host.id, host.names, phone);
+    onSelectHost(host.id, host.name, phone);
     setOpen(false);
     setQuery("");
     setHosts([]);
@@ -81,7 +82,7 @@ export function HostSearch({ onSelectHost }: HostSearchProps) {
           className="w-full justify-between"
         >
           {selectedHost ? (
-            <span>{selectedHost.names}</span>
+            <span>{selectedHost.name}</span>
           ) : (
             "Search for host..."
           )}
@@ -124,7 +125,7 @@ export function HostSearch({ onSelectHost }: HostSearchProps) {
                       )}
                     />
                     <div className="flex flex-col">
-                      <span>{host.names}</span>
+                      <span>{host.name}</span>
                       <span className="text-xs text-muted-foreground">
                         {host.phonenumber}
                       </span>

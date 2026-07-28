@@ -1,28 +1,43 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 export function useLocalStorage<T>(key: string, initialValue: T) {
-  const [storedValue, setStoredValue] = useState<T>(() => {
-    if (typeof window === "undefined") return initialValue;
+  // Server and client's first render must produce identical output, so this
+  // can NEVER branch on `typeof window` inside the initializer — window
+  // already exists by the time React hydrates on the client, so that check
+  // would return true there and immediately diverge from the server's null.
+  const [storedValue, setStoredValue] = useState<T>(initialValue);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Runs only after hydration — safe to touch localStorage here.
+  useEffect(() => {
     try {
       const item = window.localStorage.getItem(key);
-      return item ? JSON.parse(item) : initialValue;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (item) setStoredValue(JSON.parse(item));
     } catch {
-      return initialValue;
+      // ignore malformed/missing storage
+    } finally {
+      setHydrated(true);
     }
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 
-  const setValue = (value: T | ((val: T) => T)) => {
-    try {
-      const valueToStore =
-        value instanceof Function ? value(storedValue) : value;
-      setStoredValue(valueToStore);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(key, JSON.stringify(valueToStore));
-      }
-    } catch (error) {
-      console.error(error);
-    }
-  };
+  const setValue = useCallback(
+    (value: T | ((val: T) => T)) => {
+      setStoredValue((prev) => {
+        const valueToStore = value instanceof Function ? value(prev) : value;
+        try {
+          window.localStorage.setItem(key, JSON.stringify(valueToStore));
+        } catch (error) {
+          console.error(error);
+        }
+        return valueToStore;
+      });
+    },
+    [key],
+  );
 
-  return [storedValue, setValue] as const;
+  // Expose `hydrated` in case a caller wants to distinguish "definitely no
+  // user" from "haven't checked localStorage yet" (see AuthProvider note below).
+  return [storedValue, setValue, hydrated] as const;
 }
