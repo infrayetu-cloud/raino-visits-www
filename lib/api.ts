@@ -1,6 +1,6 @@
 // lib/api.ts
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8080/api/v1/";
+  process.env.NEXT_PUBLIC_API_URL || "https://api.markiti.co.ke/api/v1/";
 import { StaffUser } from "@/components/StaffAttendanceForm";
 import { Host } from "@/components/VisitorEntryForm";
 import { STORAGE_KEYS } from "@/lib/constants";
