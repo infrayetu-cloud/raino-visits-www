@@ -4,8 +4,20 @@ import * as React from "react";
 import { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { Search, Loader2, Download, Users, UserCheck } from "lucide-react";
-import { fetchStaffAttendance, fetchVisitorLogs } from "@/lib/api";
+import {
+  Search,
+  Loader2,
+  Download,
+  Users,
+  UserCheck,
+  LogOut,
+} from "lucide-react";
+import {
+  checkOutVisitor,
+  fetchStaffAttendance,
+  fetchVisitorLogs,
+} from "@/lib/api";
+import { Button } from "./ui/button";
 
 interface VisitorLogRow {
   id: string;
@@ -15,7 +27,7 @@ interface VisitorLogRow {
   host?: { names?: string };
   visit_reason: string;
   scheduled_date_time: string;
-
+  check_out_time?: string | null;
   created_at: string;
 }
 
@@ -24,6 +36,12 @@ interface StaffAttendanceRow {
   staff?: { names?: string };
   check_in_time: string;
   check_out_time?: string | null;
+  organisation_staff?: {
+    id: string;
+    name: string;
+    contact_phonenumber?: string;
+    phonenumber?: string;
+  };
 }
 
 type Tab = "visitors" | "staff";
@@ -32,9 +50,14 @@ export function HistoryView() {
   const [tab, setTab] = useState<Tab>("visitors");
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
-  const [exporting, setExporting] = useState(false);
   const [visitorRows, setVisitorRows] = useState<VisitorLogRow[]>([]);
   const [staffRows, setStaffRows] = useState<StaffAttendanceRow[]>([]);
+  const [confirmOutVisitorId, setConfirmOutVisitorId] = useState<string | null>(
+    null,
+  );
+  const [checkingOutVisitorId, setCheckingOutVisitorId] = useState<
+    string | null
+  >(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -48,7 +71,7 @@ export function HistoryView() {
       } else {
         const result = await fetchStaffAttendance({
           limit: 50,
-          names: search || undefined,
+          name: search || undefined,
         });
         setStaffRows(result || []);
       }
@@ -58,10 +81,39 @@ export function HistoryView() {
       setLoading(false);
     }
   }, [tab, search]);
+
   useEffect(() => {
     const timer = setTimeout(loadData, 300);
     return () => clearTimeout(timer);
   }, [loadData]);
+
+  async function handleCheckOutVisitor(id: string) {
+    setCheckingOutVisitorId(id);
+    try {
+      const result = await checkOutVisitor(id);
+      if (result.success) {
+        toast.success("Visitor checked out");
+        setConfirmOutVisitorId(null);
+
+        // Explicitly set the timestamp to match what your API structure expects
+        setVisitorRows((prev) =>
+          prev.map((r) =>
+            r.id === id
+              ? { ...r, check_out_time: new Date().toISOString() }
+              : r,
+          ),
+        );
+      } else {
+        toast.error("Check-out failed", { description: result.data?.error });
+      }
+    } catch {
+      toast.error("Network error", {
+        description: "Could not connect to server",
+      });
+    } finally {
+      setCheckingOutVisitorId(null);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-4xl p-4">
@@ -129,6 +181,8 @@ export function HistoryView() {
                   <th className="px-4 py-3">Host</th>
                   <th className="px-4 py-3">Reason</th>
                   <th className="px-4 py-3">Scheduled</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody>
@@ -148,6 +202,51 @@ export function HistoryView() {
                     </td>
                     <td className="px-4 py-3 text-[#7A759A]">
                       {new Date(row.scheduled_date_time).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                          row.check_out_time
+                            ? "bg-[#F7F6FB] text-[#7A759A]"
+                            : "bg-[#EAF7F5] text-[#2EC4B6]"
+                        }`}
+                      >
+                        {row.check_out_time ? "Checked out" : "On premises"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {row.check_out_time ? null : confirmOutVisitorId ===
+                        row.id ? (
+                        <div className="flex gap-2 justify-end">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setConfirmOutVisitorId(null)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleCheckOutVisitor(row.id)}
+                            disabled={checkingOutVisitorId === row.id}
+                            className="bg-gray-900 text-white"
+                          >
+                            {checkingOutVisitorId === row.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              "Confirm"
+                            )}
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setConfirmOutVisitorId(row.id)}
+                        >
+                          <LogOut className="h-4 w-4 mr-1" /> Check Out
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -172,7 +271,7 @@ export function HistoryView() {
               {staffRows.map((row) => (
                 <tr key={row.id} className="border-t border-[#E4E1F0]">
                   <td className="px-4 py-3 font-medium text-[#2E2A5E]">
-                    {row.staff?.names || ""}
+                    {row.staff?.names || row.organisation_staff?.name || ""}
                   </td>
                   <td className="px-4 py-3 text-[#7A759A]">
                     {new Date(row.check_in_time).toLocaleString()}

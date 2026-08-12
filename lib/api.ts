@@ -1,6 +1,8 @@
 // lib/api.ts
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "https://api.markiti.co.ke/api/v1/";
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8080/api/v1/";
+import { StaffUser } from "@/components/StaffAttendanceForm";
+import { Host } from "@/components/VisitorEntryForm";
 import { STORAGE_KEYS } from "@/lib/constants";
 
 function getToken(): string {
@@ -12,32 +14,87 @@ function getToken(): string {
   }
 }
 
-export async function searchHosts(query: string) {
+async function searchOrganisationStaff(
+  query: string,
+  organisationType: "rider" | "handler",
+): Promise<StaffUser[]> {
   try {
     const params = new URLSearchParams({
-      names: query,
+      display_name: query,
+      organisation_type: organisationType,
       limit: "10",
       offset: "0",
-      active: "true",
     });
-
-    const response = await fetch(`${API_BASE_URL}user?${params}`, {
+    const response = await fetch(`${API_BASE_URL}organisation?${params}`, {
       headers: { Authorization: `Bearer ${getToken()}` },
     });
-
-    if (response.status === 401) {
-      window.location.href = "/login";
-      return [];
-    }
-
-    if (!response.ok) throw new Error("Search failed");
-
+    if (!response.ok) return [];
     const data = await response.json();
-    return data.returned_resultset || [];
+    const raw = data.returned_resultset || [];
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return raw.map((item: any) => {
+      const [, extractedPhone] =
+        typeof item.display_name === "string"
+          ? item.display_name.split(" - ")
+          : [];
+
+      return {
+        id: item.id,
+        names: item.name ?? item.display_name ?? "",
+        phonenumber:
+          item.contact_phonenumber || item.phonenumber || extractedPhone || "",
+        source: "organisation" as const,
+      };
+    });
   } catch (error) {
-    console.error("Error searching hosts:", error);
+    console.error(`Error searching ${organisationType}:`, error);
     return [];
   }
+}
+
+export async function searchHosts(query: string) {
+  const params = new URLSearchParams({
+    names: query,
+    limit: "10",
+    offset: "0",
+    active: "true",
+  });
+
+  const [userResult, ridersResult, handlersResult] = await Promise.allSettled([
+    (async () => {
+      const response = await fetch(`${API_BASE_URL}user?${params}`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (response.status === 401) {
+        window.location.href = "/login";
+        return [];
+      }
+      if (!response.ok) return [];
+      const data = await response.json();
+      const raw = data.returned_resultset || [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return raw.map((item: any) => ({
+        id: item.id,
+        names: item.names,
+        phonenumber: item.phonenumber,
+        source: "user" as const,
+      })) as StaffUser[];
+    })(),
+    searchOrganisationStaff(query, "rider"),
+    searchOrganisationStaff(query, "handler"),
+  ]);
+
+  const users = userResult.status === "fulfilled" ? userResult.value : [];
+  const riders = ridersResult.status === "fulfilled" ? ridersResult.value : [];
+  const handlers =
+    handlersResult.status === "fulfilled" ? handlersResult.value : [];
+
+  if (userResult.status === "rejected") {
+    console.error("Error searching users:", userResult.reason);
+  }
+
+  return [...users, ...riders, ...handlers];
 }
 
 export function generateVisitorCode(dateTime: string): string {
@@ -126,11 +183,23 @@ export async function submitVisitorLog(payload: {
  * X-Guard-Token. The backend uses this — not the caller's main JWT — to
  * decide who gets stamped as recorded_by_id / checked_out_by_id.
  */
-export async function checkInStaff(staffId: string, guardToken: string) {
+export async function checkInStaff(
+  staffId: string,
+  guardToken: string,
+  source: "user" | "organisation",
+  vehicleRegistration?: string,
+) {
   try {
     const formData = new FormData();
     formData.append("action", "check_in");
-    formData.append("staff_id", staffId);
+    if (source === "user") {
+      formData.append("staff_id", staffId);
+    } else {
+      formData.append("organisation_staff_id", staffId);
+    }
+    if (vehicleRegistration) {
+      formData.append("vehicle_registration", vehicleRegistration);
+    }
     const response = await fetch(`${API_BASE_URL}staff-attendance`, {
       method: "POST",
       headers: {
@@ -147,11 +216,23 @@ export async function checkInStaff(staffId: string, guardToken: string) {
   }
 }
 
-export async function checkOutStaff(staffId: string, guardToken: string) {
+export async function checkOutStaff(
+  staffId: string,
+  guardToken: string,
+  source: "user" | "organisation",
+  vehicleRegistration?: string,
+) {
   try {
     const formData = new FormData();
     formData.append("action", "check_out");
-    formData.append("staff_id", staffId);
+    if (source === "user") {
+      formData.append("staff_id", staffId);
+    } else {
+      formData.append("organisation_staff_id", staffId);
+    }
+    if (vehicleRegistration) {
+      formData.append("vehicle_registration", vehicleRegistration);
+    }
     const response = await fetch(`${API_BASE_URL}staff-attendance`, {
       method: "POST",
       headers: {
@@ -175,7 +256,7 @@ export async function listCheckedInStaff(nameFilter = "") {
       limit: "50",
       offset: "0",
     });
-    if (nameFilter) params.append("names", nameFilter);
+    if (nameFilter) params.append("name", nameFilter);
     const response = await fetch(`${API_BASE_URL}staff-attendance?${params}`, {
       headers: { Authorization: `Bearer ${getToken()}` },
     });
@@ -251,7 +332,7 @@ export async function fetchVisitorLogs(params: {
 export async function fetchStaffAttendance(params: {
   offset?: number;
   limit?: number;
-  names?: string;
+  name?: string;
   status?: "open" | "closed";
 }) {
   try {
@@ -259,7 +340,7 @@ export async function fetchStaffAttendance(params: {
       limit: String(params.limit ?? 50),
       offset: String(params.offset ?? 0),
     });
-    if (params.names) query.append("names", params.names);
+    if (params.name) query.append("name", params.name);
     if (params.status) query.append("status", params.status);
 
     const response = await fetch(`${API_BASE_URL}staff-attendance?${query}`, {
@@ -276,5 +357,24 @@ export async function fetchStaffAttendance(params: {
   } catch (error) {
     console.error("Error fetching staff attendance:", error);
     return [];
+  }
+}
+
+export async function checkOutVisitor(id: string) {
+  try {
+    const formData = new URLSearchParams({ id });
+    const response = await fetch(`${API_BASE_URL}visitor-logs`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${getToken()}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: formData,
+    });
+    const result = await response.json();
+    return { success: response.ok, data: result };
+  } catch (error) {
+    console.error("Error checking out visitor:", error);
+    return { success: false, error: String(error) };
   }
 }

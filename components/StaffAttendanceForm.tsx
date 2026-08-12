@@ -13,19 +13,27 @@ import {
 } from "@/lib/api";
 
 import { useGuardSession } from "@/lib/context/guard-session-context";
-import { Host } from "./VisitorEntryForm";
 
-interface StaffUser {
+export interface StaffUser {
   id: string;
   names: string; // ✅ Plural 'names' to match User.names
   phonenumber: string; // ✅ Matches User.phonenumber
+  source: "user" | "organisation";
 }
 
 interface AttendanceRecord {
   id: string;
-  staff_id: string;
+  staff_id: string | null;
+  organisation_staff_id: string | null;
   staff?: StaffUser;
+  organisation_staff?: {
+    id: string;
+    name: string;
+    contact_phonenumber?: string;
+    phonenumber?: string;
+  };
   check_in_time: string;
+  vehicle_registration?: string | null;
 }
 
 export function StaffAttendanceForm() {
@@ -61,16 +69,28 @@ export function StaffAttendanceForm() {
     return () => clearTimeout(timer);
   }, [view, refreshList]);
 
-  async function handleCheckOut(staffId: string) {
+  async function handleCheckOut(
+    recordStaffId: string,
+    source: "user" | "organisation",
+  ) {
     if (!activeGuard) return;
-    setCheckingOutStaffId(staffId);
+    setCheckingOutStaffId(recordStaffId);
     try {
-      const result = await checkOutStaff(staffId, activeGuard.token);
+      const result = await checkOutStaff(
+        recordStaffId,
+        activeGuard.token,
+        source,
+        vehicleRegistration.trim() || undefined,
+      );
       if (result.success) {
         toast.success("Checked out");
         setConfirmOutStaffId(null);
         // Optimistically drop it from the list rather than waiting on a full refetch
-        setRows((prev) => prev.filter((r) => r.staff_id !== staffId));
+        setRows((prev) =>
+          prev.filter(
+            (r) => (r.staff_id ?? r.organisation_staff_id) !== recordStaffId,
+          ),
+        );
       } else if (result.data?.code === "GUARD_SESSION_REQUIRED") {
         toast.error("Session expired", {
           description: "Please sign in again with your PIN",
@@ -94,6 +114,8 @@ export function StaffAttendanceForm() {
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<StaffUser | null>(null);
+  const [vehicleRegistration, setVehicleRegistration] = useState("");
+
   const [submitting, setSubmitting] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -133,11 +155,17 @@ export function StaffAttendanceForm() {
     if (!selectedAgent || !activeGuard) return;
     setSubmitting(true);
     try {
-      const result = await checkInStaff(selectedAgent.id, activeGuard.token);
+      const result = await checkInStaff(
+        selectedAgent.id,
+        activeGuard.token,
+        selectedAgent.source,
+        vehicleRegistration.trim() || undefined,
+      );
       if (result.success) {
         toast.success(`${selectedAgent.names} checked in`);
         setSelectedAgent(null);
         setSearchInput("");
+        setVehicleRegistration("");
         setView("list");
       } else if (result.data?.code === "GUARD_SESSION_REQUIRED") {
         toast.error("Session expired", {
@@ -209,7 +237,7 @@ export function StaffAttendanceForm() {
                 ) : (
                   agents.map((agent) => (
                     <button
-                      key={agent.id}
+                      key={`${agent.source}-${agent.id}`}
                       type="button"
                       onMouseDown={(e) => {
                         e.preventDefault();
@@ -223,13 +251,31 @@ export function StaffAttendanceForm() {
                         {agent.names}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {agent.phonenumber || agent.phonenumber}
+                        {agent.phonenumber}
                       </div>
                     </button>
                   ))
                 )}
               </div>
             )}
+          </div>
+
+          <div className="mb-4">
+            <label
+              htmlFor="vehicleReg"
+              className="text-sm font-medium text-gray-700 mb-1 block"
+            >
+              Vehicle Registration (optional)
+            </label>
+            <Input
+              id="vehicleReg"
+              placeholder="e.g. KDA 123A"
+              value={vehicleRegistration}
+              onChange={(e) =>
+                setVehicleRegistration(e.target.value.toUpperCase())
+              }
+              className="h-11"
+            />
           </div>
 
           <div className="flex gap-3">
@@ -299,53 +345,71 @@ export function StaffAttendanceForm() {
           </div>
         ) : (
           <div className="space-y-2">
-            {rows.map((row) => (
-              <div
-                key={row.id}
-                className="flex items-center justify-between rounded-lg border border-gray-200 p-4"
-              >
-                <div>
-                  <p className="font-medium text-gray-900">
-                    {row.staff?.names ?? "Unknown"}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {row.staff?.phonenumber || row.staff?.phonenumber} · in
-                    since {new Date(row.check_in_time).toLocaleTimeString()}
-                  </p>
-                </div>
-                {confirmOutStaffId === row.staff_id ? (
-                  <div className="flex gap-2">
+            {rows.map((row) => {
+              const resolvedId =
+                row.staff_id ?? row.organisation_staff_id ?? "";
+              const resolvedSource: "user" | "organisation" = row.staff_id
+                ? "user"
+                : "organisation";
+              const displayName =
+                row.staff?.names ?? row.organisation_staff?.name ?? "Unknown";
+              const displayPhone =
+                row.staff?.phonenumber ||
+                row.organisation_staff?.contact_phonenumber ||
+                row.organisation_staff?.phonenumber ||
+                "";
+
+              return (
+                <div
+                  key={row.id}
+                  className="flex items-center justify-between rounded-lg border border-gray-200 p-4"
+                >
+                  <div>
+                    <p className="font-medium text-gray-900">{displayName}</p>
+                    <p className="text-xs text-gray-500">
+                      {displayPhone} · in since{" "}
+                      {new Date(row.check_in_time).toLocaleTimeString()}
+                      {row.vehicle_registration
+                        ? ` · ${row.vehicle_registration}`
+                        : ""}
+                    </p>
+                  </div>
+                  {confirmOutStaffId === resolvedId ? (
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setConfirmOutStaffId(null)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          handleCheckOut(resolvedId, resolvedSource)
+                        }
+                        disabled={checkingOutStaffId === resolvedId}
+                        className="bg-gray-900 text-white"
+                      >
+                        {checkingOutStaffId === resolvedId ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          "Confirm"
+                        )}
+                      </Button>
+                    </div>
+                  ) : (
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => setConfirmOutStaffId(null)}
+                      onClick={() => setConfirmOutStaffId(resolvedId)}
                     >
-                      Cancel
+                      <LogOut className="h-4 w-4 mr-1" /> Check Out
                     </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => handleCheckOut(row.staff_id)}
-                      disabled={checkingOutStaffId === row.staff_id}
-                      className="bg-gray-900 text-white"
-                    >
-                      {checkingOutStaffId === row.staff_id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        "Confirm"
-                      )}
-                    </Button>
-                  </div>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setConfirmOutStaffId(row.staff_id)}
-                  >
-                    <LogOut className="h-4 w-4 mr-1" /> Check Out
-                  </Button>
-                )}
-              </div>
-            ))}
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
