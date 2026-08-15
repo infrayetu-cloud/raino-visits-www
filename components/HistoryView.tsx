@@ -88,21 +88,12 @@ export function HistoryView() {
   }, [loadData]);
 
   async function handleCheckOutVisitor(id: string) {
+    if (checkingOutVisitorId) return; // ignore double-tap
     setCheckingOutVisitorId(id);
     try {
       const result = await checkOutVisitor(id);
       if (result.success) {
         toast.success("Visitor checked out");
-        setConfirmOutVisitorId(null);
-
-        // Explicitly set the timestamp to match what your API structure expects
-        setVisitorRows((prev) =>
-          prev.map((r) =>
-            r.id === id
-              ? { ...r, check_out_time: new Date().toISOString() }
-              : r,
-          ),
-        );
       } else {
         toast.error("Check-out failed", { description: result.data?.error });
       }
@@ -111,7 +102,9 @@ export function HistoryView() {
         description: "Could not connect to server",
       });
     } finally {
+      setConfirmOutVisitorId(null);
       setCheckingOutVisitorId(null);
+      loadData(); // always resync with server, success or not
     }
   }
 
