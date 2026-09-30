@@ -36,13 +36,6 @@ export interface Host {
   organisation_id?: string;
 }
 
-const REASONS_REQUIRING_UPLOAD = new Set([
-  "jobs",
-  "procurement",
-  "compliance_regulation",
-  "other",
-]);
-
 interface VisitorEntryFormProps {
   heading?: string;
   subheading?: string;
@@ -90,7 +83,6 @@ export function VisitorEntryForm({
   const [visitorPhone, setVisitorPhone] = useState("");
   const [visitorEmail, setVisitorEmail] = useState("");
   const [visitDateTime, setVisitDateTime] = useState("");
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [visitorCode, setVisitorCode] = useState("");
 
   const hostId = selectedAgent?.id || "";
@@ -158,7 +150,7 @@ export function VisitorEntryForm({
     setVisitorEmail("");
     setHostPhoneInput("");
     setVisitDateTime("");
-    setUploadedFile(null);
+
     setVisitorCode("");
     setReason("customer");
     setIdNumber("");
@@ -208,7 +200,6 @@ export function VisitorEntryForm({
         visitReason: reason,
         scheduledDateTime: visitDateTime,
         visitorCode,
-        photoFile: uploadedFile || undefined,
       });
 
       if (result.success) {
@@ -229,7 +220,6 @@ export function VisitorEntryForm({
     }
   }
 
-  const requiresUpload = REASONS_REQUIRING_UPLOAD.has(reason);
 
   return (
     <main className="min-h-screen bg-[#F7F6FB] p-4">
@@ -503,30 +493,7 @@ export function VisitorEntryForm({
                   </div>
                 </div>
 
-                {requiresUpload && (
-                  <div className="rounded-xl border border-[#494395]/20 bg-[#EDEBFA] p-6">
-                    <div className="flex items-start gap-3">
-                      <AlertCircle className="h-5 w-5 text-[#494395] mt-0.5" />
-                      <div className="flex-1">
-                        <Label
-                          htmlFor="document"
-                          className="text-sm font-semibold text-[#2E2A5E]"
-                        >
-                          Upload ID / Passport (Required)
-                        </Label>
-                        <Input
-                          id="document"
-                          type="file"
-                          required
-                          className="mt-3 border-[#E4E1F0] bg-white"
-                          onChange={(e) =>
-                            setUploadedFile(e.target.files?.[0] || null)
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
+              
 
                 <button
                   type="submit"

@@ -16,7 +16,7 @@ function getToken(): string {
 
 async function searchOrganisationStaff(
   query: string,
-  organisationType: "rider" | "handler",
+  organisationType: "rider" | "handler" | "casual",
 ): Promise<StaffUser[]> {
   try {
     const params = new URLSearchParams({
@@ -61,40 +61,43 @@ export async function searchHosts(query: string) {
     active: "true",
   });
 
-  const [userResult, ridersResult, handlersResult] = await Promise.allSettled([
-    (async () => {
-      const response = await fetch(`${API_BASE_URL}user?${params}`, {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
-      if (response.status === 401) {
-        window.location.href = "/login";
-        return [];
-      }
-      if (!response.ok) return [];
-      const data = await response.json();
-      const raw = data.returned_resultset || [];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return raw.map((item: any) => ({
-        id: item.id,
-        names: item.names,
-        phonenumber: item.phonenumber,
-        source: "user" as const,
-      })) as StaffUser[];
-    })(),
-    searchOrganisationStaff(query, "rider"),
-    searchOrganisationStaff(query, "handler"),
-  ]);
+  const [userResult, ridersResult, handlersResult, casualResult] =
+    await Promise.allSettled([
+      (async () => {
+        const response = await fetch(`${API_BASE_URL}user?${params}`, {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        if (response.status === 401) {
+          window.location.href = "/login";
+          return [];
+        }
+        if (!response.ok) return [];
+        const data = await response.json();
+        const raw = data.returned_resultset || [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return raw.map((item: any) => ({
+          id: item.id,
+          names: item.names,
+          phonenumber: item.phonenumber,
+          source: "user" as const,
+        })) as StaffUser[];
+      })(),
+      searchOrganisationStaff(query, "rider"),
+      searchOrganisationStaff(query, "handler"),
+      searchOrganisationStaff(query, "casual"),
+    ]);
 
   const users = userResult.status === "fulfilled" ? userResult.value : [];
   const riders = ridersResult.status === "fulfilled" ? ridersResult.value : [];
   const handlers =
     handlersResult.status === "fulfilled" ? handlersResult.value : [];
+  const casuals = casualResult.status === "fulfilled" ? casualResult.value : [];
 
   if (userResult.status === "rejected") {
     console.error("Error searching users:", userResult.reason);
   }
 
-  return [...users, ...riders, ...handlers];
+  return [...users, ...riders, ...handlers, ...casuals];
 }
 
 export function generateVisitorCode(dateTime: string): string {
