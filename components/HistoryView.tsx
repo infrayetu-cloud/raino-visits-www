@@ -18,6 +18,7 @@ import {
   fetchVisitorLogs,
 } from "@/lib/api";
 import { Button } from "./ui/button";
+import { formatVisitReason } from "./VisitorEntryForm";
 
 interface VisitorLogRow {
   id: string;
@@ -26,6 +27,7 @@ interface VisitorLogRow {
   visitor_email?: string;
   host?: { names?: string };
   visit_reason: string;
+  visit_reason_other?: string | null;
   scheduled_date_time: string;
   check_out_time?: string | null;
   created_at: string;
@@ -191,7 +193,7 @@ export function HistoryView() {
                       {row.host?.names || ""}
                     </td>
                     <td className="px-4 py-3 text-[#7A759A]">
-                      {row.visit_reason}
+                      {formatVisitReason(row.visit_reason, row.visit_reason_other)}
                     </td>
                     <td className="px-4 py-3 text-[#7A759A]">
                       {new Date(row.scheduled_date_time).toLocaleString()}

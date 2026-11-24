@@ -148,6 +148,7 @@ export async function submitVisitorLog(payload: {
   visitorPhone: string;
   visitorEmail: string;
   visitReason: string;
+  visitReasonOther?: string;
   scheduledDateTime: string;
   visitorCode: string;
   photoFile?: File;
@@ -159,6 +160,9 @@ export async function submitVisitorLog(payload: {
     formData.append("visitor_name", payload.visitorName);
     formData.append("visitor_phone", payload.visitorPhone);
     formData.append("visit_reason", payload.visitReason);
+    if (payload.visitReason === "other" && payload.visitReasonOther) {
+      formData.append("visit_reason_other", payload.visitReasonOther.trim());
+    }
     formData.append("scheduled_date_time", payload.scheduledDateTime);
     formData.append("visitor_code", payload.visitorCode);
 

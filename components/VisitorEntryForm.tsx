@@ -27,6 +27,21 @@ import {
   Mail,
 } from "lucide-react";
 
+export const VISIT_REASON_LABELS: Record<string, string> = {
+  customer: "Customer/Sales",
+  jobs: "Jobs & Opportunities",
+  procurement: "Procurement/Service Provider",
+  compliance_regulation: "Compliance & Regulation",
+  partners_stakeholders: "Partners & Stakeholders",
+  other: "Other",
+};
+
+export function formatVisitReason(reason?: string, other?: string | null) {
+  if (!reason) return "—";
+  if (reason === "other") return other ? `Other: ${other}` : "Other (not specified)";
+  return VISIT_REASON_LABELS[reason] ?? reason;
+}
+
 export interface Host {
   id: string;
   names: string;
@@ -79,6 +94,7 @@ export function VisitorEntryForm({
   const [hostPhoneInput, setHostPhoneInput] = useState("");
   const searchWrapperRef = useRef<HTMLDivElement>(null);
   const [reason, setReason] = useState("customer");
+  const [reasonOther, setReasonOther] = useState("");
   const [visitorName, setVisitorName] = useState("");
   const [visitorPhone, setVisitorPhone] = useState("");
   const [visitorEmail, setVisitorEmail] = useState("");
@@ -153,6 +169,7 @@ export function VisitorEntryForm({
 
     setVisitorCode("");
     setReason("customer");
+    setReasonOther("");
     setIdNumber("");
   }
 
@@ -198,6 +215,7 @@ export function VisitorEntryForm({
         visitorPhone,
         visitorEmail,
         visitReason: reason,
+        visitReasonOther: reason === "other" ? reasonOther : undefined,
         scheduledDateTime: visitDateTime,
         visitorCode,
       });
@@ -465,7 +483,7 @@ export function VisitorEntryForm({
                     </Label>
                     <Select
                       onValueChange={(val) => setReason(val)}
-                      defaultValue="customer"
+                      value={reason}
                     >
                       <SelectTrigger
                         id="reason"
@@ -490,6 +508,25 @@ export function VisitorEntryForm({
                         <SelectItem value="other">Other</SelectItem>
                       </SelectContent>
                     </Select>
+                    {reason === "other" && (
+                      <div className="mt-3">
+                        <Label
+                          htmlFor="reasonOther"
+                          className="text-sm font-semibold text-[#2E2A5E]"
+                        >
+                          Please specify the reason
+                        </Label>
+                        <Input
+                          id="reasonOther"
+                          required
+                          maxLength={255}
+                          value={reasonOther}
+                          onChange={(e) => setReasonOther(e.target.value)}
+                          placeholder="e.g. Delivering documents, Interview follow-up"
+                          className="mt-2 border-[#E4E1F0] focus:border-[#494395]"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -503,7 +540,8 @@ export function VisitorEntryForm({
                     !visitorName ||
                     !visitorPhone ||
                     !idNumber ||
-                    !visitDateTime
+                    !visitDateTime ||
+                    (reason === "other" && !reasonOther.trim())
                   }
                   className="w-full h-12 rounded-xl bg-[#494395] hover:bg-[#3A3578] text-white font-semibold transition-colors disabled:opacity-40 disabled:hover:bg-[#494395]"
                 >
@@ -575,6 +613,16 @@ export function VisitorEntryForm({
                         {visitorName}
                       </p>
                       <p className="text-xs text-[#7A759A]">{visitorPhone}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-xs font-semibold text-[#7A759A]">
+                        REASON FOR VISIT
+                      </p>
+                      <p className="text-sm font-medium text-[#2E2A5E] mt-1">
+                        {reason === "other"
+                          ? `Other: ${reasonOther}`
+                          : VISIT_REASON_LABELS[reason] ?? reason}
+                      </p>
                     </div>
                     <div className="col-span-2">
                       <p className="text-xs font-semibold text-[#7A759A]">
